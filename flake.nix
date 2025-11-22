@@ -1,5 +1,7 @@
 {
   description = "Allow flakes to be used with Nix < 2.4";
 
-  outputs = _: { };
+  outputs = _: {
+    lib = import ./lib.nix;
+  };
 }
