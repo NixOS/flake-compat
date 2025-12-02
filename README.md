@@ -5,7 +5,10 @@
 To use, add the following to your `flake.nix`:
 
 ```nix
-inputs.flake-compat.url = "https://flakehub.com/f/edolstra/flake-compat/1.tar.gz";
+inputs.flake-compat = {
+  url = "github:NixOS/flake-compat";
+  flake = false;
+};
 ```
 
 Afterwards, create a `default.nix` file containing the following:
@@ -18,7 +21,7 @@ Afterwards, create a `default.nix` file containing the following:
       nodeName = lock.nodes.root.inputs.flake-compat;
     in
     fetchTarball {
-      url = lock.nodes.${nodeName}.locked.url or "https://github.com/edolstra/flake-compat/archive/${lock.nodes.${nodeName}.locked.rev}.tar.gz";
+      url = lock.nodes.${nodeName}.locked.url or "https://github.com/NixOS/flake-compat/archive/${lock.nodes.${nodeName}.locked.rev}.tar.gz";
       sha256 = lock.nodes.${nodeName}.locked.narHash;
     }
   )
