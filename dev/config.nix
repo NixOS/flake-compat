@@ -15,9 +15,10 @@
 
   # https://flake.parts/options/flake-parts.html#opt-perSystem
   perSystem =
-    { config
-    , pkgs
-    , ...
+    {
+      config,
+      pkgs,
+      ...
     }:
     {
 
