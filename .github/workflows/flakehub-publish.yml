@@ -14,5 +14,5 @@ jobs:
       - uses: "DeterminateSystems/nix-installer-action@main"
       - uses: "DeterminateSystems/flakehub-push@main"
         with:
-          name: "edolstra/flake-compat"
+          name: "NixOS/flake-compat"
           visibility: "public"
