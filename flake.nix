@@ -7,7 +7,7 @@
       allOutputs = publicOutputs // {
         # Use explicit inherit, to ensure allOutputs is evaluated without
         # evaluating devOutputs.
-        inherit (devOutputs) devShells checks;
+        inherit (devOutputs) devShells checks formatter;
       };
 
       # Currently none (`import flake-compat`)
