@@ -105,7 +105,7 @@ let
       flake = import (flakeSrc + "/flake.nix");
 
       inputs = mapAttrs (
-        n: v:
+        _n: v:
         if v.flake or true then
           callFlake4 (fetchTree (v.locked // v.info)) v.inputs
         else
@@ -222,7 +222,7 @@ let
 
       flake = import (outPath + "/flake.nix");
 
-      inputs = mapAttrs (inputName: inputSpec: allNodes.${resolveInput inputSpec}.result) (
+      inputs = mapAttrs (_inputName: inputSpec: allNodes.${resolveInput inputSpec}.result) (
         node.inputs or { }
       );
 

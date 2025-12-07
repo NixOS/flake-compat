@@ -1,0 +1,7 @@
+# direnv
+.direnv
+# git-hooks.nix
+.pre-commit-config.yaml
+# nix
+result
+result-*
