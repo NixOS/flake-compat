@@ -7,9 +7,9 @@
 
 {
   src,
+  impureOverrides ? { },
   system ? builtins.currentSystem or "unknown-system",
 }:
-
 let
   inherit (builtins) mapAttrs;
 
@@ -197,119 +197,150 @@ let
     in
     "${toString y'}${pad (toString m)}${pad (toString d)}${pad (toString hours)}${pad (toString minutes)}${pad (toString seconds)}";
 
-  allNodes = mapAttrs (
-    key: node:
+  nameValuePair = name: value: { inherit name value; };
+
+  mapAttrs' =
+    # A function, given an attribute's name and value, returns a new `nameValuePair`.
+    f:
+    # Attribute set to map over.
+    set:
+    builtins.listToAttrs (map (attr: f attr set.${attr}) (builtins.attrNames set));
+
+  makeFlakeCompat =
+    impureOverrides:
     let
-      isRelative = node.locked.type or null == "path" && builtins.substring 0 1 node.locked.path != "/";
+      rootOverrides = mapAttrs' (
+        input: lockKey: nameValuePair lockKey (impureOverrides.${input} or null)
+      ) lockFile.nodes.${lockFile.root}.inputs;
 
-      parentNode = allNodes.${getInputByPath lockFile.root node.parent};
+      allNodes = mapAttrs (
+        key: node:
+        let
+          isRelative = node.locked.type or null == "path" && builtins.substring 0 1 node.locked.path != "/";
 
-      sourceInfo =
-        if key == lockFile.root then
-          rootSrc
-        else if isRelative then
-          parentNode.sourceInfo
-        else
-          fetchTree (node.info or { } // removeAttrs node.locked [ "dir" ]);
+          parentNode = allNodes.${getInputByPath lockFile.root node.parent};
 
-      subdir = if key == lockFile.root then "" else node.locked.dir or "";
+          sourceInfo =
+            if key == lockFile.root then
+              rootSrc
+            else if rootOverrides.${key} != null then
+              {
+                type = "path";
+                outPath = rootOverrides.${key};
+                narHash = throw "narHash unimplemented for impureOverride";
+              }
+            else if isRelative then
+              parentNode.sourceInfo
+            else
+              fetchTree (node.info or { } // removeAttrs node.locked [ "dir" ]);
 
-      outPath =
-        if isRelative then
-          parentNode.outPath + (if node.locked.path == "" then "" else "/" + node.locked.path)
-        else
-          sourceInfo.outPath + (if subdir == "" then "" else "/" + subdir);
+          subdir = if key == lockFile.root then "" else node.locked.dir or "";
 
-      flake = import (outPath + "/flake.nix");
+          outPath =
+            if isRelative then
+              parentNode.outPath + (if node.locked.path == "" then "" else "/" + node.locked.path)
+            else
+              sourceInfo.outPath + (if subdir == "" then "" else "/" + subdir);
 
-      inputs = mapAttrs (_inputName: inputSpec: allNodes.${resolveInput inputSpec}.result) (
-        node.inputs or { }
-      );
+          flake = import (outPath + "/flake.nix");
 
-      # Resolve a input spec into a node name. An input spec is
-      # either a node name, or a 'follows' path from the root
-      # node.
-      resolveInput =
-        inputSpec: if builtins.isList inputSpec then getInputByPath lockFile.root inputSpec else inputSpec;
+          inputs = mapAttrs (_inputName: inputSpec: allNodes.${resolveInput inputSpec}.result) (
+            node.inputs or { }
+          );
 
-      # Follow an input path (e.g. ["dwarffs" "nixpkgs"]) from the
-      # root node, returning the final node.
-      getInputByPath =
-        nodeName: path:
-        if path == [ ] then
-          nodeName
-        else
-          getInputByPath
-            # Since this could be a 'follows' input, call resolveInput.
-            (resolveInput lockFile.nodes.${nodeName}.inputs.${builtins.head path})
-            (builtins.tail path);
+          # Resolve a input spec into a node name. An input spec is
+          # either a node name, or a 'follows' path from the root
+          # node.
+          resolveInput =
+            inputSpec':
+            let
+              inputSpec = builtins.trace inputSpec' inputSpec';
+              resolved = if builtins.isList inputSpec then getInputByPath lockFile.root inputSpec else inputSpec;
+            in
+            builtins.trace "=> ${resolved}" resolved;
 
-      outputs = flake.outputs (inputs // { self = result; });
+          # Follow an input path (e.g. ["dwarffs" "nixpkgs"]) from the
+          # root node, returning the final node.
+          getInputByPath =
+            nodeName: path:
+            if path == [ ] then
+              nodeName
+            else
+              getInputByPath
+                # Since this could be a 'follows' input, call resolveInput.
+                (resolveInput lockFile.nodes.${nodeName}.inputs.${builtins.head path})
+                (builtins.tail path);
+
+          outputs = flake.outputs (inputs // { self = result; });
+
+          result =
+            outputs
+            # We add the sourceInfo attribute for its metadata, as they are
+            # relevant metadata for the flake. However, the outPath of the
+            # sourceInfo does not necessarily match the outPath of the flake,
+            # as the flake may be in a subdirectory of a source.
+            # This is shadowed in the next //
+            // sourceInfo
+            // {
+              # This shadows the sourceInfo.outPath
+              inherit outPath;
+
+              inherit inputs;
+              inherit outputs;
+              inherit sourceInfo;
+              _type = "flake";
+            };
+
+        in
+        {
+          result =
+            if node.flake or true then
+              assert builtins.isFunction flake.outputs;
+              result
+            else
+              sourceInfo // { inherit sourceInfo outPath; };
+
+          inherit outPath sourceInfo;
+        }
+      ) lockFile.nodes;
 
       result =
-        outputs
-        # We add the sourceInfo attribute for its metadata, as they are
-        # relevant metadata for the flake. However, the outPath of the
-        # sourceInfo does not necessarily match the outPath of the flake,
-        # as the flake may be in a subdirectory of a source.
-        # This is shadowed in the next //
-        // sourceInfo
-        // {
-          # This shadows the sourceInfo.outPath
-          inherit outPath;
-
-          inherit inputs;
-          inherit outputs;
-          inherit sourceInfo;
-          _type = "flake";
-        };
+        if !(builtins.pathExists lockFilePath) then
+          callLocklessFlake rootSrc
+        else if lockFile.version == 4 then
+          callFlake4 rootSrc (lockFile.inputs)
+        else if lockFile.version >= 5 && lockFile.version <= 7 then
+          allNodes.${lockFile.root}.result
+        else
+          throw "lock file '${lockFilePath}' has unsupported version ${toString lockFile.version}";
 
     in
-    {
-      result =
-        if node.flake or true then
-          assert builtins.isFunction flake.outputs;
-          result
-        else
-          sourceInfo // { inherit sourceInfo outPath; };
+    rec {
+      outputs = result;
 
-      inherit outPath sourceInfo;
-    }
-  ) lockFile.nodes;
+      defaultNix =
+        builtins.removeAttrs result [ "__functor" ]
+        // (
+          if result ? defaultPackage.${system} then { default = result.defaultPackage.${system}; } else { }
+        )
+        // (
+          if result ? packages.${system}.default then
+            { default = result.packages.${system}.default; }
+          else
+            { }
+        );
 
-  result =
-    if !(builtins.pathExists lockFilePath) then
-      callLocklessFlake rootSrc
-    else if lockFile.version == 4 then
-      callFlake4 rootSrc (lockFile.inputs)
-    else if lockFile.version >= 5 && lockFile.version <= 7 then
-      allNodes.${lockFile.root}.result
-    else
-      throw "lock file '${lockFilePath}' has unsupported version ${toString lockFile.version}";
+      shellNix =
+        defaultNix
+        // (if result ? devShell.${system} then { default = result.devShell.${system}; } else { })
+        // (
+          if result ? devShells.${system}.default then
+            { default = result.devShells.${system}.default; }
+          else
+            { }
+        );
+      overrideInputs = impureOverrides': makeFlakeCompat (impureOverrides // impureOverrides');
+    };
 
 in
-rec {
-  outputs = result;
-
-  defaultNix =
-    builtins.removeAttrs result [ "__functor" ]
-    // (
-      if result ? defaultPackage.${system} then { default = result.defaultPackage.${system}; } else { }
-    )
-    // (
-      if result ? packages.${system}.default then
-        { default = result.packages.${system}.default; }
-      else
-        { }
-    );
-
-  shellNix =
-    defaultNix
-    // (if result ? devShell.${system} then { default = result.devShell.${system}; } else { })
-    // (
-      if result ? devShells.${system}.default then
-        { default = result.devShells.${system}.default; }
-      else
-        { }
-    );
-}
+makeFlakeCompat impureOverrides
