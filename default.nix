@@ -18,7 +18,7 @@ let
   lockFile = builtins.fromJSON (builtins.readFile lockFilePath);
 
   fetchTree =
-    builtins.fetchTree or (
+    builtins.fetchFinalTree or builtins.fetchTree or (
       info:
       if info.type == "github" then
         {
