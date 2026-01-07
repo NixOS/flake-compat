@@ -7,13 +7,16 @@
 
 {
   src,
+  root ? "/",
   system ? builtins.currentSystem or "unknown-system",
 }:
 
 let
   inherit (builtins) mapAttrs;
 
-  lockFilePath = src + "/flake.lock";
+  root' = "/" + root + "/";
+
+  lockFilePath = src + root' + "/flake.lock";
 
   lockFile = builtins.fromJSON (builtins.readFile lockFilePath);
 
@@ -167,7 +170,12 @@ let
       lastModified = 0;
       lastModifiedDate = formatSecondsSinceEpoch 0;
     }
-    // (if src ? outPath then src else tryFetchGit src);
+    // (
+      let
+        src' = (if src ? outPath then src else tryFetchGit src);
+      in
+      src' // { outPath = src'.outPath + root'; }
+    );
 
   # Format number of seconds in the Unix epoch as %Y%m%d%H%M%S.
   formatSecondsSinceEpoch =
