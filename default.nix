@@ -1,9 +1,9 @@
-# Compatibility function to allow flakes to be used by
-# non-flake-enabled Nix versions. Given a source tree containing a
-# 'flake.nix' and 'flake.lock' file, it fetches the flake inputs and
-# calls the flake's 'outputs' function. It then returns an attrset
-# containing 'defaultNix' (to be used in 'default.nix'), 'shellNix'
-# (to be used in 'shell.nix').
+# Compatibility function to allow flakes to be used by non-flake-enabled Nix
+# versions. Given a source tree ('src') containing a 'flake.nix' and
+# 'flake.lock' files in '${src}/${root}/', it fetches the flake inputs and calls
+# the flake's 'outputs' function. It then returns an attrset containing
+# 'defaultNix' (to be used in 'default.nix'), 'shellNix' (to be used in
+# 'shell.nix').
 
 {
   src,
