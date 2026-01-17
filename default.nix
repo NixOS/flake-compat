@@ -1,19 +1,22 @@
-# Compatibility function to allow flakes to be used by
-# non-flake-enabled Nix versions. Given a source tree containing a
-# 'flake.nix' and 'flake.lock' file, it fetches the flake inputs and
-# calls the flake's 'outputs' function. It then returns an attrset
-# containing 'defaultNix' (to be used in 'default.nix'), 'shellNix'
-# (to be used in 'shell.nix').
+# Compatibility function to allow flakes to be used by non-flake-enabled Nix
+# versions. Given a source tree ('src') containing a 'flake.nix' and
+# 'flake.lock' files in '${src}/${root}/', it fetches the flake inputs and calls
+# the flake's 'outputs' function. It then returns an attrset containing
+# 'defaultNix' (to be used in 'default.nix'), 'shellNix' (to be used in
+# 'shell.nix').
 
 {
   src,
+  root ? "/",
   system ? builtins.currentSystem or "unknown-system",
 }:
 
 let
   inherit (builtins) mapAttrs;
 
-  lockFilePath = src + "/flake.lock";
+  root' = "/" + root + "/";
+
+  lockFilePath = src + root' + "/flake.lock";
 
   lockFile = builtins.fromJSON (builtins.readFile lockFilePath);
 
@@ -167,7 +170,12 @@ let
       lastModified = 0;
       lastModifiedDate = formatSecondsSinceEpoch 0;
     }
-    // (if src ? outPath then src else tryFetchGit src);
+    // (
+      let
+        src' = (if src ? outPath then src else tryFetchGit src);
+      in
+      src' // { outPath = src'.outPath + root'; }
+    );
 
   # Format number of seconds in the Unix epoch as %Y%m%d%H%M%S.
   formatSecondsSinceEpoch =
