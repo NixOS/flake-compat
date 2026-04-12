@@ -13,6 +13,13 @@
     inputs.treefmt-nix.flakeModule
   ];
 
+  flake = {
+    templates.default = {
+      path = ../templates/default;
+      description = "Default files for flake-compat configuration.";
+    };
+  };
+
   # https://flake.parts/options/flake-parts.html#opt-perSystem
   perSystem =
     {

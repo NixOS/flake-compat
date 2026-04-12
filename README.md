@@ -17,6 +17,18 @@ This project was originally at `edolstra/flake-compat` and is now maintained at 
 
 ## Usage
 
+### Automatic setup (template)
+
+To generate both `default.nix` and `shell.nix` automatically, use the default template:
+
+```console
+nix flake init -t github:NixOS/flake-compat
+```
+
+This creates a `default.nix` and `shell.nix` equivalent to the manual setup below.
+
+### Manual setup
+
 To use, add the following to your `flake.nix`:
 
 ```nix
