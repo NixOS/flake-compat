@@ -43,6 +43,32 @@ Afterwards, create a `default.nix` file containing the following:
 ) { src = ./.; }).defaultNix
 ```
 
+NOTE: Flake fetcher is aware of Git submodules when `inputs.self.submodules` is set to `true` in `flake.nix`.
+For compatibility in stable Nix, paste the following content in `default.nix` instead:
+
+```nix
+let
+  lock = builtins.fromJSON (builtins.readFile ./flake.lock);
+
+  fetchFromLockFile =
+    nodeName:
+    fetchTarball {
+      url =
+        lock.nodes.${nodeName}.locked.url
+          or "https://github.com/${lock.nodes.${nodeName}.locked.owner}/${lock.nodes.${nodeName}.locked.repo}/archive/${lock.nodes.${nodeName}.locked.rev}.tar.gz";
+      sha256 = lock.nodes.${nodeName}.locked.narHash;
+    };
+
+  lib = (import (fetchFromLockFile lock.nodes.root.inputs.nixpkgs) { }).lib;
+in
+(import (fetchFromLockFile lock.nodes.root.inputs.flake-compat) {
+  src = lib.fileset.toSource {
+    root = ./.;
+    fileset = (lib.fileset.gitTrackedWith { recurseSubmodules = true; }) ./.;
+  };
+}).defaultNix
+```
+
 If you would like a `shell.nix` file, create one containing the above, replacing `defaultNix` with `shellNix`.
 
 You can access any flake output via the `outputs` attribute returned by `flake-compat`, e.g.
