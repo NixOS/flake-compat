@@ -133,7 +133,18 @@ let
         src:
         if isGit then
           let
-            res = builtins.fetchGit src;
+            # Peek at flake.nix to check for submodule settings, mirroring
+            # what Nix does (lazy fetch of flake.nix before full fetch).
+            flake = import (src + "/flake.nix");
+            submodules = flake.inputs.self.submodules or false;
+            lfs = flake.inputs.self.lfs or false;
+            res = builtins.fetchGit (
+              {
+                url = src;
+              }
+              // (if submodules then { inherit submodules; } else { })
+              // (if lfs then { inherit lfs; } else { })
+            );
           in
           if res.rev == "0000000000000000000000000000000000000000" then
             removeAttrs res [
