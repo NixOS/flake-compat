@@ -10,6 +10,7 @@
 
   imports = [
     inputs.git-hooks.flakeModule
+    inputs.nix-unit.modules.flake.default
     inputs.treefmt-nix.flakeModule
   ];
 
@@ -18,6 +19,7 @@
     {
       config,
       pkgs,
+      inputs',
       ...
     }:
     {
@@ -52,34 +54,18 @@
         };
       };
 
-      # Checks
-      checks = {
-        # nix-unit tests for flake-compat
-        nix-unit =
-          pkgs.runCommand "nix-unit-tests"
-            {
-              nativeBuildInputs = [ pkgs.nix-unit ];
-            }
-            ''
-              # Run nix-unit tests on the flake-compat default.nix
-              export HOME=$TMPDIR
-              nix-unit --eval-store "$HOME" ${../.}/tests.nix 2>&1 | tee $out
-
-              # Check if there were any failures
-              if grep -q "FAIL" $out; then
-                echo "Tests failed!"
-                exit 1
-              fi
-
-              echo "All tests passed!"
-            '';
+      # Nix-unit tests
+      # https://flake.parts/options/nix-unit.html
+      nix-unit = {
+        allowNetwork = true;
+        tests = import ../tests.nix;
       };
 
       # Development shell
       devShells.default = pkgs.mkShell {
         nativeBuildInputs = [
           config.treefmt.build.wrapper
-          pkgs.nix-unit
+          inputs'.nix-unit.packages.default
         ];
 
         shellHook = ''

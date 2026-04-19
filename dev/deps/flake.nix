@@ -18,6 +18,16 @@
       url = "github:numtide/treefmt-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    nix-unit = {
+      url = "github:nix-community/nix-unit";
+
+      inputs = {
+        flake-parts.follows = "flake-parts";
+        nixpkgs.follows = "nixpkgs";
+        treefmt-nix.follows = "treefmt-nix";
+      };
+    };
   };
 
   # Input-only flake. Accessed via flake-compat in root flake to extract inputs.
