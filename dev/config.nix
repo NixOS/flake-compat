@@ -19,7 +19,6 @@
     {
       config,
       pkgs,
-      inputs',
       ...
     }:
     {
@@ -64,8 +63,8 @@
       # Development shell
       devShells.default = pkgs.mkShell {
         nativeBuildInputs = [
+          config.nix-unit.package
           config.treefmt.build.wrapper
-          inputs'.nix-unit.packages.default
         ];
 
         shellHook = ''
