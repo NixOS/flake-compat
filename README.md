@@ -12,6 +12,7 @@ The flake-compat function returns
 - `defaultNix` for use in `default.nix`,
 - `shellNix` for `shell.nix`) attributes,
 - `outputs` for simple access to the flake outputs.
+- `inputs` for access to the evaluated flake inputs, without evaluating any outputs
 
 This project was originally at `edolstra/flake-compat` and is now maintained at `NixOS/flake-compat`.
 

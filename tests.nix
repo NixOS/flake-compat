@@ -60,4 +60,26 @@
       expr = result ? shellNix;
       expected = true;
     };
+
+  # Makes sure that we can evaluate inputs without evaluating outputs
+  testInputsOnly =
+    let
+      result = import ./default.nix {
+        src = ./cases/inputs-only;
+      };
+    in
+    {
+      expr = builtins.attrNames result.inputs;
+      expected = [ "flake-compat" ];
+    };
+  testInputsOnlyLockless =
+    let
+      result = import ./default.nix {
+        src = ./cases/inputs-only-lockless;
+      };
+    in
+    {
+      expr = builtins.attrNames result.inputs;
+      expected = [ ];
+    };
 }
