@@ -99,31 +99,16 @@ let
         throw "flake input has unsupported input type '${info.type}'"
     );
 
-  callFlake4 =
-    flakeSrc: locks:
-    let
-      flake = import (flakeSrc + "/flake.nix");
-
-      inputs = mapAttrs (
-        _n: v:
-        if v.flake or true then
-          callFlake4 (fetchTree (v.locked // v.info)) v.inputs
-        else
-          fetchTree (v.locked // v.info)
-      ) locks;
-
-      outputs = flakeSrc // (flake.outputs (inputs // { self = outputs; }));
-    in
-    assert flake.edition == 201909;
-    outputs;
-
   callLocklessFlake =
     flakeSrc:
     let
       flake = import (flakeSrc + "/flake.nix");
       outputs = flakeSrc // (flake.outputs ({ self = outputs; }));
     in
-    outputs;
+    {
+      inputs = { };
+      outputsResult = outputs;
+    };
 
   rootSrc =
     let
@@ -221,7 +206,7 @@ let
 
       flake = import (outPath + "/flake.nix");
 
-      inputs = mapAttrs (_inputName: inputSpec: allNodes.${resolveInput inputSpec}.result) (
+      inputs = mapAttrs (_inputName: inputSpec: allNodes.${resolveInput inputSpec}.outputsResult) (
         node.inputs or { }
       );
 
@@ -265,30 +250,29 @@ let
 
     in
     {
-      result =
+      outputsResult =
         if node.flake or true then
           assert builtins.isFunction flake.outputs;
           result
         else
           sourceInfo // { inherit sourceInfo outPath; };
 
-      inherit outPath sourceInfo;
+      inherit outPath sourceInfo inputs;
     }
   ) lockFile.nodes;
 
   result =
     if !(builtins.pathExists lockFilePath) then
       callLocklessFlake rootSrc
-    else if lockFile.version == 4 then
-      callFlake4 rootSrc (lockFile.inputs)
     else if lockFile.version >= 5 && lockFile.version <= 7 then
-      allNodes.${lockFile.root}.result
+      allNodes.${lockFile.root}
     else
       throw "lock file '${lockFilePath}' has unsupported version ${toString lockFile.version}";
 
 in
 rec {
-  outputs = result;
+  outputs = result.outputsResult;
+  inherit (result) inputs;
 
   defaultNix =
     builtins.removeAttrs result [ "__functor" ]
